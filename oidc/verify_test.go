@@ -187,6 +187,47 @@ func TestVerifyAudience(t *testing.T) {
 			},
 			signKey: newRSAKey(t),
 		},
+		{
+			name:    "multiple audiences, multiple clientIDs",
+			idToken: `{"iss":"https://foo","aud":["client1","client2","client3"]}`,
+			config: Config{
+				ClientIDs:       []string{"client1", "client3"},
+				SkipExpiryCheck: true,
+			},
+			signKey: newRSAKey(t),
+		},
+		{
+			name:    "multiple audiences, some match",
+			idToken: `{"iss":"https://foo","aud":["client1","client2","client3"]}`,
+			config: Config{
+				ClientIDs:       []string{"client1", "client4"},
+				SkipExpiryCheck: true,
+			},
+			signKey: newRSAKey(t),
+			wantErr: true,
+		},
+		{
+			name:    "clientID and clientIDs both set",
+			idToken: `{"iss":"https://foo","aud":["client1","client2","client3"]}`,
+			config: Config{
+				ClientID:        "client1",
+				ClientIDs:       []string{"client1"},
+				SkipExpiryCheck: true,
+			},
+			signKey: newRSAKey(t),
+			wantErr: true,
+		},
+		{
+			name:    "clientID and clientIDs both empty",
+			idToken: `{"iss":"https://foo","aud":["client1","client2","client3"]}`,
+			config: Config{
+				ClientID:        "",
+				ClientIDs:       nil,
+				SkipExpiryCheck: true,
+			},
+			signKey: newRSAKey(t),
+			wantErr: true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, test.run)

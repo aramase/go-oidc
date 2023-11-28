@@ -83,6 +83,15 @@ type Config struct {
 	//
 	// If not provided, users must explicitly set SkipClientIDCheck.
 	ClientID string
+
+	// Expected audiences of the token. For a majority of the cases this is expected to be
+	// the ID of the client that initialized the login flow. It may occasionally differ if
+	// the provider supports the authorizing party (azp) claim.
+	//
+	// This field is mutually exclusive with ClientID.
+	// Only use this field if you need to support multiple audiences.
+	// If not provided, users must explicitly set SkipClientIDCheck.
+	ClientIDs []string
 	// If specified, only this set of algorithms may be used to sign the JWT.
 	//
 	// If the IDTokenVerifier is created from a provider with (*Provider).Verifier, this
@@ -268,16 +277,28 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 		}
 	}
 
-	// If a client ID has been provided, make sure it's part of the audience. SkipClientIDCheck must be true if ClientID is empty.
+	// If client ID(s) has been provided, make sure it's part of the audience. SkipClientIDCheck must be true if ClientID and ClientIDs is empty.
 	//
 	// This check DOES NOT ensure that the ClientID is the party to which the ID Token was issued (i.e. Authorized party).
 	if !v.config.SkipClientIDCheck {
+		if v.config.ClientID == "" && len(v.config.ClientIDs) == 0 {
+			return nil, fmt.Errorf("oidc: invalid configuration, clientID or clientIDs must be provided or SkipClientIDCheck must be set")
+		}
+		if v.config.ClientID != "" && len(v.config.ClientIDs) > 0 {
+			return nil, fmt.Errorf("oidc: invalid configuration, ClientID and ClientIDs cannot both be set")
+		}
+
+		var clientIDs []string
 		if v.config.ClientID != "" {
-			if !contains(t.Audience, v.config.ClientID) {
-				return nil, fmt.Errorf("oidc: expected audience %q got %q", v.config.ClientID, t.Audience)
-			}
+			clientIDs = []string{v.config.ClientID}
 		} else {
-			return nil, fmt.Errorf("oidc: invalid configuration, clientID must be provided or SkipClientIDCheck must be set")
+			clientIDs = v.config.ClientIDs
+		}
+
+		for _, clientID := range clientIDs {
+			if !contains(t.Audience, clientID) {
+				return nil, fmt.Errorf("oidc: expected audience %q got %q", clientID, t.Audience)
+			}
 		}
 	}
 
